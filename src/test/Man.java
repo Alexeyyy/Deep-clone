@@ -5,26 +5,30 @@ import java.util.Hashtable;
 import java.util.List;
 
 public class Man {
-    public String name;
-    public int age;
-    public List<String> favoriteBooks;
-    public List<Book> books;
-    public Hashtable<String, Object> hashtable;
+    private String name;
+    private int age;
+    private List<String> favouriteBooks;
+    private List<Book> books;
+    private Hashtable<String, Object> hashtable;
     private Man thisMan;
 
-    public Man() {}
-
-    public Man(String name, int age, List<String> favoriteBooks, ArrayList<Book> books) {
+    public Man(String name, int age, ArrayList<String> favouriteBooks, ArrayList<Book> books) {
         this.name = name;
         this.age = age;
-        this.favoriteBooks = favoriteBooks;
+        this.favouriteBooks = favouriteBooks;
         this.books = books;
         this.thisMan = this;
+    }
 
+    /*
+    * Специально для проверки ссылок.
+    */
+    public void addHardcore() {
         hashtable = new Hashtable<>();
         hashtable.put("#", this.books.get(0));
-        //hashtable.put("@", this);
-        //hashtable.put("$", new Object());
+        hashtable.put("@", this);
+        hashtable.put("$", new Object());
+
     }
 
     public String getName() {
@@ -43,12 +47,12 @@ public class Man {
         this.age = age;
     }
 
-    public List<String> getFavoriteBooks() {
-        return favoriteBooks;
+    public List<String> getFavouriteBooks() {
+        return favouriteBooks;
     }
 
-    public void setFavoriteBooks(List<String> favoriteBooks) {
-        this.favoriteBooks = favoriteBooks;
+    public void setFavouriteBooks(List<String> favouriteBooks) {
+        this.favouriteBooks = favouriteBooks;
     }
 
     public List<Book> getBooks() {

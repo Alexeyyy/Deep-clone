@@ -1,11 +1,9 @@
 package test;
 
 public class Book {
-    public String name;
-    public String author;
-    public int releaseYear;
-
-    public Book() {}
+    private String name;
+    private String author;
+    private int releaseYear;
 
     public Book(String name, String author, int releaseYear) {
         this.author = author;

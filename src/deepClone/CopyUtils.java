@@ -4,20 +4,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.*;
 
-public class DeepCloner {
+public class CopyUtils {
     /*
-    * Проверяет: является ли тип примитивом?
+    * Метод, открытый клиенту. Метод позволяет сделать полную копию объекта любой сложности и вложенности.
+    * Поддерживает примитивы, кастомные объекты, коллекции, словари, массивы и т.д.
+    * @obj - объект, копию которого необходимо сделать.
     * */
-    private static boolean isPrimitiveExtended(Class type) {
-        if (type == Boolean.class || type == Float.class || type == Long.class || type == Integer.class
-                || type == Short.class || type == Character.class || type == Byte.class || type == Double.class
-                || type == String.class || type.isPrimitive()) {
-            return true;
-        }
-        return false;
-    }
-
-    public static Object makeFullCopy(Object obj) {
+    public static Object deepCopy(Object obj) {
         HashMap<Integer, Integer> hashes = new HashMap<>();
         HashMap<Integer, Object> parts = new HashMap<>();
 
@@ -163,6 +156,19 @@ public class DeepCloner {
         }
 
         return copy;
+    }
+
+    /*
+     * Проверяет: является ли тип примитивом? Немного расширяет возможность isPrimitive().
+     * @type - входящий тип.
+     * */
+    private static boolean isPrimitiveExtended(Class type) {
+        if (type == Boolean.class || type == Float.class || type == Long.class || type == Integer.class
+                || type == Short.class || type == Character.class || type == Byte.class || type == Double.class
+                || type == String.class || type.isPrimitive()) {
+            return true;
+        }
+        return false;
     }
 
     /*
