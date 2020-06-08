@@ -6,51 +6,6 @@ import java.util.*;
 
 public class DeepCloner {
     /*
-    * Сканирует объект, составляя карту полей, подъобъектов.
-    * Впоследствии используется при процедуру deepClone.
-    * */
-    public static void scanObject(Object obj, String objUUID, int depth, ArrayList<ObjectRelation> relations, HashMap<String, Object> structure, ArrayList<Integer> hashes) throws Exception {
-        int objHashCode =obj.hashCode();
-        Class objClass = obj.getClass();
-
-        // Сохраняем хеш объекта.
-        hashes.add(objHashCode);
-
-        // Устанавливаем глубину сканирования объекта.
-        depth = depth + 1;
-
-        // Получаем все поля, из которых состоит объект, включая приватные.
-        Field[] fields = obj.getClass().getDeclaredFields();
-
-        // Сохраняем поля для создания будущей копии.
-        // Данные хранятся в виде ключ подструктуры - поля.
-        structure.put(objUUID, obj);
-
-        for (Field f: fields) {
-            f.setAccessible(true);
-            Object fObj = f.get(obj);
-            Class fObjClass = fObj.getClass();
-            int fObjHashcode = fObj.hashCode();
-
-            // Поле не примитив, а объект какого-то класса.
-            if (!isPrimitiveExtended(fObjClass)) {
-                // Определяем UUID нового подъобъекта.
-                String subObjUUID = UUID.randomUUID().toString();
-
-                // Ранее проходили данный объект? Имеется в виду ссылка на другой объект.
-                if (hashes.contains(fObjHashcode)) {
-                    relations.add(new ObjectRelation(objUUID, subObjUUID, objClass, fObjClass, objHashCode, fObjHashcode, depth, true));
-                } else {
-                    relations.add(new ObjectRelation(objUUID, subObjUUID, objClass, fObjClass, objHashCode, fObjHashcode, depth, false));
-
-                    // "Сканируем" дочерний объект только в случае если это не ссылка на уже проверенный ранее объект.
-                    scanObject(fObj, subObjUUID, depth, relations, structure, hashes);
-                }
-            }
-        }
-    }
-
-    /*
     * Проверяет: является ли тип примитивом?
     * */
     private static boolean isPrimitiveExtended(Class type) {
@@ -62,21 +17,6 @@ public class DeepCloner {
         return false;
     }
 
-    public static Object copyPrimitiveObject(Class type, Object from) throws Exception {
-        Object to = type.newInstance();
-
-        for (Field toField : to.getClass().getDeclaredFields()) {
-            toField.setAccessible(true);
-            for (Field fromField : from.getClass().getDeclaredFields()) {
-                if (toField.getName() == fromField.getName() && toField.getType() == fromField.getType()) {
-                    toField.set(to, fromField.get(from));
-                }
-            }
-        }
-
-        return to;
-    }
-
     public static Object makeFullCopy(Object obj) {
         HashMap<Integer, Integer> hashes = new HashMap<>();
         HashMap<Integer, Object> parts = new HashMap<>();
@@ -84,9 +24,8 @@ public class DeepCloner {
         Object copy = null;
 
         try {
-            Constructor objConst = obj.getClass().getConstructor();
-            copy = objConst.newInstance();
-            copy = deepClone(obj, copy, hashes, parts);
+            copy = new Object();
+            copy = deepClone(obj, hashes, parts);
         } catch (Exception ex) {
             System.out.println("Error: " + ex.getMessage());
         }
@@ -96,8 +35,13 @@ public class DeepCloner {
 
     /*
     * Метод создания копии объекта.
+    * @obj - исходный объект.
+    * @hashes - словарь сопоставлений хешей: <ключ, значение> = <хеш исходной части объекта, хеш клонированной части объекта>.
+    * @parts - словарь сопоставлений хешей и частей созданного объекта. Цель: если есть ссылки на объекты, то сразу определять ссылки.
     * */
-    private static Object deepClone(Object obj, Object copy, HashMap<Integer, Integer> hashes, HashMap<Integer, Object> parts) throws Exception {
+    private static Object deepClone(Object obj, HashMap<Integer, Integer> hashes, HashMap<Integer, Object> parts) throws Exception {
+        Object copy;
+
         // Объект пустой.
         if (obj == null) {
             return null;
@@ -136,7 +80,7 @@ public class DeepCloner {
                 }
                 else {
                     copyItem = new Object();
-                    copyItem = deepClone(item, copyItem, hashes, parts);
+                    copyItem = deepClone(item, hashes, parts);
 
                     hashes.put(item.hashCode(), copyItem.hashCode());
                     parts.put(copyItem.hashCode(), copyItem);
@@ -165,10 +109,9 @@ public class DeepCloner {
                 // Это новый объект.
                 else {
                     copyKey = new Object();
-                    copyKey = deepClone(key, copyKey, hashes, parts);
+                    copyKey = deepClone(key, hashes, parts);
                     hashes.put(key.hashCode(), copyKey.hashCode());
                     parts.put(copyKey.hashCode(), copyKey);
-
                 }
 
                 // Клонируем объект.
@@ -180,7 +123,7 @@ public class DeepCloner {
                 }
                 else {
                     copyValue = new Object();
-                    copyValue = deepClone(value, copyValue, hashes, parts);
+                    copyValue = deepClone(value, hashes, parts);
                     hashes.put(value.hashCode(), copyValue.hashCode());
                     parts.put(copyValue.hashCode(), copyValue);
                 }
@@ -192,9 +135,8 @@ public class DeepCloner {
             return copy;
         }
 
-        // Это объект. А здесь нужен конструктор.
-        Constructor constructor = obj.getClass().getConstructor();
-        copy = constructor.newInstance();
+        // Создаем объект, если нет пустого конструктора - приходится немного магию творить.
+        copy = instantiate(objCls);
 
         // Создали объект, сохранили все в hashes и parts.
         hashes.put(obj.hashCode(), copy.hashCode());
@@ -211,7 +153,7 @@ public class DeepCloner {
                 fc.setAccessible(true);
 
                 if (f.getName() == fc.getName()) {
-                    Object value = deepClone(f.get(obj), fc.get(copy), hashes, parts);
+                    Object value = deepClone(f.get(obj), hashes, parts);
                     fc.set(copy, value);
 
                     // Выходим из внутреннего цикла, так как все поля уже сопоставлены.
@@ -221,5 +163,62 @@ public class DeepCloner {
         }
 
         return copy;
+    }
+
+    /*
+    * Идея создания метода заключается в том, что у типа может и не быть конструктора по умолчанию.
+    * Например, есть тип Book. Но конструктор переопределен и есть только Book(int cost), а конструктора Book() нет.
+    * */
+    private static Object instantiate(Class cls) throws Exception {
+        final Constructor constructor = getConstructor(cls);
+        final ArrayList<Object> params = new ArrayList<>();
+        final Class[] parameters = constructor.getParameterTypes();
+
+        for (Class type: parameters) {
+            if (type == Integer.class || type == Float.class || type == Long.class
+                    || type == Short.class || type == Double.class || type == Byte.class) {
+                params.add(1);
+                continue;
+            }
+            if (type == Integer.TYPE || type == Float.TYPE || type == Long.TYPE
+                || type == Short.TYPE || type == Double.TYPE || type == Byte.TYPE) {
+                params.add(1);
+                continue;
+            }
+            if (type == String.class) {
+                params.add("");
+                continue;
+            }
+            if (type == Character.class || type == Character.TYPE) {
+                params.add(' ');
+                continue;
+            }
+            if (type == Boolean.class || type == Boolean.TYPE) {
+                params.add(false);
+                continue;
+            }
+
+            // Если объект, то просто отправляем пустой объект.
+            params.add(null);
+        }
+
+        final Object instance = constructor.newInstance(params.toArray());
+
+        return instance;
+    }
+
+    /*
+    * Находит пустой конструктор или если его нет, то первый конструктор.
+    * */
+    private static Constructor getConstructor(Class cls) {
+        Constructor[] constructors = cls.getConstructors();
+
+        for (Constructor c: constructors) {
+            if (c.getParameterTypes().length == 0) {
+                return c;
+            }
+        }
+
+        return constructors[0];
     }
 }
