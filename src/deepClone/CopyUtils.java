@@ -1,7 +1,9 @@
 package deepClone;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Parameter;
 import java.util.*;
 
 public class CopyUtils {
@@ -10,17 +12,16 @@ public class CopyUtils {
     * Поддерживает примитивы, кастомные объекты, коллекции, словари, массивы и т.д.
     * @obj - объект, копию которого необходимо сделать.
     * */
-    public static Object deepCopy(Object obj) {
+    public static Object deepCopy(Object obj) throws Exception {
         HashMap<Integer, Integer> hashes = new HashMap<>();
         HashMap<Integer, Object> parts = new HashMap<>();
 
         Object copy = null;
 
         try {
-            copy = new Object();
             copy = deepClone(obj, hashes, parts);
         } catch (Exception ex) {
-            System.out.println("Error: " + ex.getMessage());
+            throw new Exception("Unable to create copy");
         }
 
         return copy;
@@ -58,6 +59,32 @@ public class CopyUtils {
             return copy;
         }
 
+        // Если объект просто массив.
+        if (objCls.isArray()) {
+            int length = Array.getLength(obj);
+            Object copyArray = Array.newInstance(objCls.getComponentType(), length);
+
+            for (int i = 0; i < length; i++) {
+                Object item = Array.get(obj, i);
+                Object copyItem = null;
+
+                // Ссылка на объект.
+                if (hashes.containsKey(item.hashCode())) {
+                    copyItem = parts.get(hashes.get(item.hashCode()));
+                }
+                else {
+                    copyItem = deepClone(item, hashes, parts);
+
+                    hashes.put(item.hashCode(), copyItem.hashCode());
+                    parts.put(copyItem.hashCode(), copyItem);
+                }
+
+                Array.set(copyArray, i, copyItem);
+            }
+
+            return copyArray;
+        }
+
         // Если объект коллекция.
         if (obj instanceof Collection<?>) {
             copy = (Collection) objCls.getConstructor().newInstance();
@@ -72,7 +99,6 @@ public class CopyUtils {
                     copyItem = parts.get(hashes.get(item.hashCode()));
                 }
                 else {
-                    copyItem = new Object();
                     copyItem = deepClone(item, hashes, parts);
 
                     hashes.put(item.hashCode(), copyItem.hashCode());
@@ -101,7 +127,6 @@ public class CopyUtils {
                 }
                 // Это новый объект.
                 else {
-                    copyKey = new Object();
                     copyKey = deepClone(key, hashes, parts);
                     hashes.put(key.hashCode(), copyKey.hashCode());
                     parts.put(copyKey.hashCode(), copyKey);
@@ -115,7 +140,6 @@ public class CopyUtils {
                     copyValue = parts.get(hashes.get(value.hashCode()));
                 }
                 else {
-                    copyValue = new Object();
                     copyValue = deepClone(value, hashes, parts);
                     hashes.put(value.hashCode(), copyValue.hashCode());
                     parts.put(copyValue.hashCode(), copyValue);
@@ -174,13 +198,15 @@ public class CopyUtils {
     /*
     * Идея создания метода заключается в том, что у типа может и не быть конструктора по умолчанию.
     * Например, есть тип Book. Но конструктор переопределен и есть только Book(int cost), а конструктора Book() нет.
+    * @cls - класс, объект которого необходимо создать.
     * */
     private static Object instantiate(Class cls) throws Exception {
         final Constructor constructor = getConstructor(cls);
         final ArrayList<Object> params = new ArrayList<>();
-        final Class[] parameters = constructor.getParameterTypes();
+        final Parameter[] parameters = constructor.getParameters();
+        final Class[] parameterTypes = constructor.getParameterTypes();
 
-        for (Class type: parameters) {
+        for (Class type: parameterTypes) {
             if (type == Integer.class || type == Float.class || type == Long.class
                     || type == Short.class || type == Double.class || type == Byte.class) {
                 params.add(1);
@@ -204,8 +230,18 @@ public class CopyUtils {
                 continue;
             }
 
+            if (Collection.class.isAssignableFrom(type)) {
+                params.add(null);
+                continue;
+            }
+
+            if (Map.class.isAssignableFrom(type)) {
+                params.add(null);
+                continue;
+            }
+
             // Если объект, то просто отправляем пустой объект.
-            params.add(null);
+            params.add(new Object());
         }
 
         final Object instance = constructor.newInstance(params.toArray());
@@ -215,6 +251,7 @@ public class CopyUtils {
 
     /*
     * Находит пустой конструктор или если его нет, то первый конструктор.
+    * @cls - класс, для которого ищется подходящий конструктор.
     * */
     private static Constructor getConstructor(Class cls) {
         Constructor[] constructors = cls.getConstructors();
