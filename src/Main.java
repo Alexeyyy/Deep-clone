@@ -48,7 +48,7 @@ class Main {
             System.out.println("Test 2 failed. The error occurred while copying object");
         }
 
-        // Test 3. Копирование сложного объекта (смотри метод addHardcore()).
+        // Test 3. Копирование сложного объекта (смотри метод addHardcore() в MyComplexObject).
         try {
             MyComplexObject obj = DeepCopyTest.getMyComplexObject();
             MyComplexObject copyObj = (MyComplexObject) CopyUtils.deepCopy(obj);
